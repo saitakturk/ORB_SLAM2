@@ -27,8 +27,10 @@ namespace ORB_SLAM2
 {
 
 long unsigned int KeyFrame::nNextId=0;
+long unsigned int KeyFrame::nNextMappingId=0;
 
 KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
+    im_(F.im_.clone()), rgb_(F.rgb_.clone()), semidense_flag_(false), interKF_depth_flag_(false), poseChanged(false),
     mnFrameId(F.mnId),  mTimeStamp(F.mTimeStamp), mnGridCols(FRAME_GRID_COLS), mnGridRows(FRAME_GRID_ROWS),
     mfGridElementWidthInv(F.mfGridElementWidthInv), mfGridElementHeightInv(F.mfGridElementHeightInv),
     mnTrackReferenceForFrame(0), mnFuseTargetForKF(0), mnBALocalForKF(0), mnBAFixedForKF(0),
@@ -41,9 +43,12 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
     mvInvLevelSigma2(F.mvInvLevelSigma2), mnMinX(F.mnMinX), mnMinY(F.mnMinY), mnMaxX(F.mnMaxX),
     mnMaxY(F.mnMaxY), mK(F.mK), mvpMapPoints(F.mvpMapPoints), mpKeyFrameDB(pKFDB),
     mpORBvocabulary(F.mpORBvocabulary), mbFirstConnection(true), mpParent(NULL), mbNotErase(false),
-    mbToBeErased(false), mbBad(false), mHalfBaseline(F.mb/2), mpMap(pMap)
+    mbToBeErased(false), mbBad(false), mbNotEraseSemiDense(false),
+    mbNotEraseDrawer(false), mHalfBaseline(F.mb/2), mpMap(pMap)
 {
     mnId=nNextId++;
+
+    mnMappingId = 0;
 
     mGrid.resize(mnGridCols);
     for(int i=0; i<mnGridCols;i++)
@@ -53,7 +58,42 @@ KeyFrame::KeyFrame(Frame &F, Map *pMap, KeyFrameDatabase *pKFDB):
             mGrid[i][j] = F.mGrid[i][j];
     }
 
-    SetPose(F.mTcw);    
+    SetPose(F.mTcw);
+
+    //  compute some value for  semi dense  process
+     cv::Mat image_mean,image_stddev,gradx,grady;
+     I_stddev = (float)sigmaI;
+     image_mean.release();
+     image_stddev.release();
+
+     gradx = cv::Mat::zeros(im_.rows, im_.cols, CV_32F);
+     grady = cv::Mat::zeros(im_.rows, im_.cols, CV_32F);
+     cv::Scharr(im_, gradx, CV_32F, 1, 0, 1/32.0);
+     cv::Scharr(im_, grady, CV_32F, 0, 1, 1/32.0);
+     cv::magnitude(gradx,grady,GradImg);
+     cv::phase(gradx,grady,GradTheta,true);
+     gradx.release();
+     grady.release();
+
+     depth_map_ = cv::Mat::zeros(im_.rows, im_.cols, CV_32F);
+     depth_map_checked_ = cv::Mat::zeros(im_.rows, im_.cols, CV_32F);
+     depth_sigma_ = cv::Mat::zeros(im_.rows, im_.cols, CV_32F);
+     SemiDensePointSets_ = cv::Mat::zeros(im_.rows, im_.cols, CV_32FC3);
+
+     mLines = cv::Mat::zeros(0,4,CV_32F);
+     mLineIndex = cv::Mat::ones(im_.rows, im_.cols, CV_32S) * (-1);
+     mLinesSeg = cv::Mat::zeros(0,4,CV_32F);
+     mLines3D = cv::Mat::zeros(0,6,CV_32F);
+     mEdgeIndex = cv::Mat::ones(im_.rows, im_.cols, CV_32S) * (-1);
+     mEdgeMap = NULL;
+     line3D_flag =false;
+     mTranscriptFlag=false;
+}
+
+KeyFrame::~KeyFrame()
+{
+    if(mEdgeMap)
+        delete mEdgeMap;
 }
 
 void KeyFrame::ComputeBoW()
@@ -81,6 +121,8 @@ void KeyFrame::SetPose(const cv::Mat &Tcw_)
     Ow.copyTo(Twc.rowRange(0,3).col(3));
     cv::Mat center = (cv::Mat_<float>(4,1) << mHalfBaseline, 0 , 0, 1);
     Cw = Twc*center;
+
+    poseChanged = true;
 }
 
 cv::Mat KeyFrame::GetPose()
@@ -456,7 +498,7 @@ void KeyFrame::SetBadFlag()
         unique_lock<mutex> lock(mMutexConnections);
         if(mnId==0)
             return;
-        else if(mbNotErase)
+        else if(mbNotErase || mbNotEraseSemiDense || mbNotEraseDrawer)  //semi dense: prevent erasing when flags on
         {
             mbToBeErased = true;
             return;
@@ -542,6 +584,9 @@ void KeyFrame::SetBadFlag()
 
     mpMap->EraseKeyFrame(this);
     mpKeyFrameDB->erase(this);
+
+    //semi dense: release some memory
+    Release();
 }
 
 bool KeyFrame::isBad()
@@ -660,6 +705,290 @@ float KeyFrame::ComputeSceneMedianDepth(const int q)
     sort(vDepths.begin(),vDepths.end());
 
     return vDepths[(vDepths.size()-1)/q];
+}
+
+cv::Mat KeyFrame::GetImage()
+{
+    //unique_lock<mutex> lock(mMutexImage);
+    return im_.clone();
+}
+
+
+cv::KeyPoint KeyFrame::GetKeyPointUn(const size_t &idx) const
+{
+    return mvKeysUn[idx];
+}
+
+int KeyFrame::GetKeyPointScaleLevel(const size_t &idx) const
+{
+    return mvKeysUn[idx].octave;
+}
+
+cv::Mat KeyFrame::GetDescriptor(const size_t &idx)
+{
+    return mDescriptors.row(idx).clone();
+}
+
+cv::Mat KeyFrame::GetDescriptors()
+{
+    return mDescriptors.clone();
+}
+
+vector<cv::KeyPoint> KeyFrame::GetKeyPoints() const
+{
+    return mvKeys;
+}
+
+vector<cv::KeyPoint> KeyFrame::GetKeyPointsUn() const
+{
+    return mvKeysUn;
+}
+
+cv::Mat KeyFrame::GetCalibrationMatrix() const
+{
+    return mK.clone();
+}
+
+DBoW2::FeatureVector KeyFrame::GetFeatureVector()
+{
+    unique_lock<mutex> lock(mMutexFeatures);
+    return mFeatVec;
+}
+
+vector<float> KeyFrame::GetAllPointDepths()
+{
+    vector<MapPoint*> vpMapPoints;
+    cv::Mat Tcw_;
+    {
+    unique_lock<mutex>  lock(mMutexFeatures);
+    unique_lock<mutex>  lock2(mMutexPose);
+    vpMapPoints = mvpMapPoints;
+    Tcw_ = Tcw.clone();
+    }
+
+    vector<float> vDepths;
+    vDepths.reserve(mvpMapPoints.size());
+    cv::Mat Rcw2 = Tcw_.row(2).colRange(0,3);
+    Rcw2 = Rcw2.t();
+    float zcw = Tcw_.at<float>(2,3);
+    for(size_t i=0; i<mvpMapPoints.size(); i++)
+    {
+        if(mvpMapPoints[i])
+        {
+            MapPoint* pMP = mvpMapPoints[i];
+            cv::Mat x3Dw = pMP->GetWorldPos();
+            float z = Rcw2.dot(x3Dw)+zcw;
+            vDepths.push_back(1/z);
+        }
+    }
+
+    sort(vDepths.begin(),vDepths.end());
+
+    //README
+    return vDepths;//[(vDepths.size()-1)/q];
+}
+
+bool KeyFrame::MappingIdDelay()
+{
+    unique_lock<mutex> lock(mMutexMappingId);
+    if(mnMappingId == 0) return false;
+    return (nNextMappingId - mnMappingId) > 10;
+}
+
+void KeyFrame::IncreaseMappingId()
+{
+    unique_lock<mutex> lock(mMutexMappingId);
+    mnMappingId = nNextMappingId++;
+}
+
+bool KeyFrame::Mapped()
+{
+    unique_lock<mutex> lock(mMutexMappingId);
+    return (mnMappingId != 0);
+}
+
+
+bool KeyFrame::PoseChanged()
+{
+    unique_lock<mutex> lock(mMutexPose);
+    return poseChanged;
+}
+
+void KeyFrame::SetPoseChanged(bool bChanged)
+{
+    unique_lock<mutex> lock(mMutexPose);
+    poseChanged = bChanged;
+}
+
+void KeyFrame::Release()
+{
+    im_.release();
+    rgb_.release();
+    depth_map_.release();
+    depth_map_checked_.release();
+    depth_sigma_.release();
+    GradImg.release();
+    GradTheta.release();
+    SemiDensePointSets_.release();
+    mLines.release();
+    mLines3D.release();
+    mLinesSeg.release();
+    mLineIndex.release();
+    mEdgeIndex.release();
+}
+
+void KeyFrame::SetNotEraseSemiDense()
+{
+    unique_lock<mutex> lock(mMutexConnections);
+    mbNotEraseSemiDense = true;
+}
+
+void KeyFrame::SetEraseSemiDense()
+{
+    {
+        unique_lock<mutex> lock(mMutexConnections);
+        if(mspLoopEdges.empty())
+        {
+            mbNotEraseSemiDense = false;
+        }
+    }
+
+    if(mbToBeErased)
+    {
+        SetBadFlag();
+    }
+}
+
+void KeyFrame::SetNotEraseDrawer()
+{
+    unique_lock<mutex> lock(mMutexConnections);
+    mbNotEraseDrawer = true;
+}
+
+void KeyFrame::SetEraseDrawer()
+{
+    {
+        unique_lock<mutex> lock(mMutexConnections);
+        if(mspLoopEdges.empty())
+        {
+            mbNotEraseDrawer = false;
+        }
+    }
+
+    if(mbToBeErased)
+    {
+        SetBadFlag();
+    }
+}
+
+vector<float> KeyFrame::GetTexCoordinate(float x, float y, float z)
+{
+    const cv::Mat P = (cv::Mat_<float>(3, 1) << x, y, z);
+    // 3D in camera coordinates
+    const cv::Mat Pc = GetRotation() * P + GetTranslation();
+    const float &PcX = Pc.at<float>(0);
+    const float &PcY = Pc.at<float>(1);
+    const float &PcZ = Pc.at<float>(2);
+
+    std::vector<float> uv;
+    if(PcZ > 0) {
+        // Project in image and check it is not outside
+        const float invz = 1.0f / PcZ;
+        const float u = fx * PcX * invz + cx;
+        const float v = fy * PcY * invz + cy;
+
+        if (IsInImage(u,v)){
+            float uTex = u / rgb_.size().width;
+            float vTex = v / rgb_.size().height;
+            uv.push_back(uTex);
+            uv.push_back(vTex);
+        }
+    }
+    return uv;
+}
+std::vector<cv::Mat> KeyFrame::GetPlaneCloud(int i)
+{
+        std::vector<cv::Mat> planeCloud;
+
+        float step=0.01;
+
+        cv::Vec4f plane = mPlanes[i];
+        int p = mPlaneLines[i].first;
+        int q = mPlaneLines[i].second;
+        cv::Mat line1= mLines3D.row(p);
+        cv::Mat line2= mLines3D.row(q);
+        cv::Mat ps1 = line1(cv::Range::all(),cv::Range(0,3));
+        cv::Mat pe1 = line1(cv::Range::all(),cv::Range(3,6));
+        cv::Mat ps2 = line2(cv::Range::all(),cv::Range(0,3));
+        cv::Mat pe2 = line2(cv::Range::all(),cv::Range(3,6));
+        
+        cv::Mat dir1=(pe1-ps1);
+        dir1=dir1/cv::norm(dir1);
+
+        cv::Mat dir2=(pe2-ps2);
+        dir2=dir2/cv::norm(dir2);
+
+        cv::Mat normal= (cv::Mat_<float>(1, 3)<< plane[0], plane[1], plane[2]);
+        cv::Mat t1 = normal.cross(dir1);
+        float iend = (pe1.at<float>(0)-ps1.at<float>(0)) /dir1.at<float>(0);
+
+        for(float i=0;i<iend;i=i+step)
+        {
+            for(float j= -0.25;j<0.25;j=j+step)
+            {
+                cv::Mat pcl;
+                pcl = ps1 + i*dir1 + j*t1;
+                planeCloud.push_back(pcl);
+            }
+        }
+        cv::Mat t2 = normal.cross(dir2);
+        iend = (pe2.at<float>(0)-ps2.at<float>(0)) /dir2.at<float>(0);
+
+        for(float i=0;i<iend;i=i+step)
+        {
+            for(float j= -0.25;j<0.25;j=j+step)
+            {
+                cv::Mat pcl;
+                pcl = ps2 + i*dir2 + j*t2;
+                planeCloud.push_back(pcl);
+            }
+        }
+        return planeCloud;
+}
+void KeyFrame::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M)
+{
+    if(!Tcw.empty())
+    {
+        cv::Mat Rwc(3,3,CV_32F);
+        cv::Mat twc(3,1,CV_32F);
+        {
+            unique_lock<mutex> lock(mMutexPose);
+            Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
+            twc = -Rwc*Tcw.rowRange(0,3).col(3);
+        }
+
+        M.m[0] = Rwc.at<float>(0,0);
+        M.m[1] = Rwc.at<float>(1,0);
+        M.m[2] = Rwc.at<float>(2,0);
+        M.m[3]  = 0.0;
+
+        M.m[4] = Rwc.at<float>(0,1);
+        M.m[5] = Rwc.at<float>(1,1);
+        M.m[6] = Rwc.at<float>(2,1);
+        M.m[7]  = 0.0;
+
+        M.m[8] = Rwc.at<float>(0,2);
+        M.m[9] = Rwc.at<float>(1,2);
+        M.m[10] = Rwc.at<float>(2,2);
+        M.m[11]  = 0.0;
+
+        M.m[12] = twc.at<float>(0);
+        M.m[13] = twc.at<float>(1);
+        M.m[14] = twc.at<float>(2);
+        M.m[15]  = 1.0;
+    }
+    else
+        M.SetIdentity();
 }
 
 } //namespace ORB_SLAM

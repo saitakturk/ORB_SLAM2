@@ -37,8 +37,17 @@
 #include "Initializer.h"
 #include "MapDrawer.h"
 #include "System.h"
+#include "Modeler.h"
+#include "CARV/ModelDrawer.h"
+#include "LineDetector.h"
 
 #include <mutex>
+
+
+class ProbabilityMapping;
+class Modeler;
+class ModelDrawer;
+class LineDetector;
 
 namespace ORB_SLAM2
 {
@@ -49,6 +58,7 @@ class Map;
 class LocalMapping;
 class LoopClosing;
 class System;
+
 
 class Tracking
 {  
@@ -66,6 +76,9 @@ public:
     void SetLoopClosing(LoopClosing* pLoopClosing);
     void SetViewer(Viewer* pViewer);
 
+	void SetSemiDenseMapping(ProbabilityMapping* pSemiDenseMapping);
+    void SetModeler(Modeler* pModeler);
+
     // Load new settings
     // The focal lenght should be similar or scale prediction will fail when projecting points
     // TODO: Modify MapPoint::PredictScale to take into account focal lenght
@@ -73,6 +86,7 @@ public:
 
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
+    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
 
 
 public:
@@ -93,6 +107,7 @@ public:
     int mSensor;
 
     // Current Frame
+    LineDetector mLineDetector;
     Frame mCurrentFrame;
     cv::Mat mImGray;
 
@@ -153,6 +168,9 @@ protected:
     //Other Thread Pointers
     LocalMapping* mpLocalMapper;
     LoopClosing* mpLoopClosing;
+	
+	ProbabilityMapping* mpSemiDenseMapping;
+    Modeler* mpModeler;
 
     //ORB
     ORBextractor* mpORBextractorLeft, *mpORBextractorRight;

@@ -23,6 +23,8 @@
 #include "ORBmatcher.h"
 #include "Optimizer.h"
 
+#include "ProbabilityMapping.h"
+
 #include<mutex>
 
 namespace ORB_SLAM2
@@ -84,7 +86,15 @@ void LocalMapping::Run()
                 KeyFrameCulling();
             }
 
+            mpCurrentKeyFrame->IncreaseMappingId();
+            
+            {
+            unique_lock<mutex> lock(mpSemiDenseMapping->mMutexSemiDense);
+            }
+            //mpModeler->AddKeyFrameEntry(mpCurrentKeyFrame);
+            mpModeler->AddTexture(mpCurrentKeyFrame);
             mpLoopCloser->InsertKeyFrame(mpCurrentKeyFrame);
+            
         }
         else if(Stop())
         {
@@ -109,6 +119,10 @@ void LocalMapping::Run()
     }
 
     SetFinish();
+}
+void LocalMapping::SetSemiDenseMapping(ProbabilityMapping *pSemiDenseMapping)
+{
+    mpSemiDenseMapping=pSemiDenseMapping;
 }
 
 void LocalMapping::InsertKeyFrame(KeyFrame *pKF)
@@ -644,7 +658,9 @@ void LocalMapping::KeyFrameCulling()
             continue;
         const vector<MapPoint*> vpMapPoints = pKF->GetMapPointMatches();
 
-        int nObs = 3;
+        int /*nObs = 2;
+        if(mbMonocular)*/
+            nObs = 3;
         const int thObs=nObs;
         int nRedundantObservations=0;
         int nMPs=0;
@@ -755,6 +771,11 @@ bool LocalMapping::isFinished()
 {
     unique_lock<mutex> lock(mMutexFinish);
     return mbFinished;
+}
+
+void LocalMapping::SetModeler(Modeler *pModeler)
+{
+    mpModeler=pModeler;
 }
 
 } //namespace ORB_SLAM

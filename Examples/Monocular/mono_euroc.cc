@@ -1,3 +1,4 @@
+
 /**
 * This file is part of ORB-SLAM2.
 *
@@ -70,7 +71,7 @@ int main(int argc, char **argv)
     for(int ni=0; ni<nImages; ni++)
     {
         // Read image from file
-        im = cv::imread(vstrImageFilenames[ni],CV_LOAD_IMAGE_UNCHANGED);
+        im = cv::imread(vstrImageFilenames[ni],cv::IMREAD_UNCHANGED);
         double tframe = vTimestamps[ni];
 
         if(im.empty())
@@ -153,3 +154,5 @@ void LoadImages(const string &strImagePath, const string &strPathTimes,
         }
     }
 }
+
+

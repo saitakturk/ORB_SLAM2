@@ -26,9 +26,9 @@
 namespace ORB_SLAM2
 {
 
-Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Tracking *pTracking, const string &strSettingPath):
-    mpSystem(pSystem), mpFrameDrawer(pFrameDrawer),mpMapDrawer(pMapDrawer), mpTracker(pTracking),
-    mbFinishRequested(false), mbFinished(true), mbStopped(true), mbStopRequested(false)
+Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, ModelDrawer* pModelDrawer, Tracking *pTracking, const string &strSettingPath):
+    mpSystem(pSystem), mpFrameDrawer(pFrameDrawer),mpMapDrawer(pMapDrawer), mpModelDrawer(pModelDrawer),mpTracker(pTracking),
+    mbFinishRequested(false), mbFinished(true), mbStopped(false), mbStopRequested(false)
 {
     cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
@@ -49,14 +49,22 @@ Viewer::Viewer(System* pSystem, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer
     mViewpointY = fSettings["Viewer.ViewpointY"];
     mViewpointZ = fSettings["Viewer.ViewpointZ"];
     mViewpointF = fSettings["Viewer.ViewpointF"];
+
+    mfx = fSettings["Camera.fx"];
+    mfy = fSettings["Camera.fy"];
+    mcx = fSettings["Camera.cx"];
+    mcy = fSettings["Camera.cy"];
+    int nRGB = fSettings["Camera.RGB"];
+    mbRGB=nRGB;
+
 }
 
 void Viewer::Run()
 {
     mbFinished = false;
-    mbStopped = false;
 
-    pangolin::CreateWindowAndBind("ORB-SLAM2: Map Viewer",1024,768);
+//    pangolin::CreateWindowAndBind("ORB-SLAM2: Map Viewer",1024,768);
+    pangolin::CreateWindowAndBind("ORB-SLAM2: Map Viewer",mImageWidth+175,mImageHeight);
 
     // 3D Mouse handler requires depth testing to be enabled
     glEnable(GL_DEPTH_TEST);
@@ -67,21 +75,31 @@ void Viewer::Run()
 
     pangolin::CreatePanel("menu").SetBounds(0.0,1.0,0.0,pangolin::Attach::Pix(175));
     pangolin::Var<bool> menuFollowCamera("menu.Follow Camera",true,true);
-    pangolin::Var<bool> menuShowPoints("menu.Show Points",true,true);
-    pangolin::Var<bool> menuShowKeyFrames("menu.Show KeyFrames",true,true);
-    pangolin::Var<bool> menuShowGraph("menu.Show Graph",true,true);
+    pangolin::Var<bool> menuShowPoints("menu.Show Points",false,true);
+    pangolin::Var<bool> menuShowKeyFrames("menu.Show KeyFrames",false,true);
+    pangolin::Var<bool> menuShowGraph("menu.Show Graph",false,true);
+    pangolin::Var<bool> menuShowSemiDense("menu.Show SemiDense",false,true);
+    pangolin::Var<double> menuSigmaTH("menu.Sigma",0.02,1e-10,0.05,false);
+    pangolin::Var<bool> menuCameraView("menu.Camera View",true,true);
+    pangolin::Var<bool> menuShowModel("menu.Show Model", true,true);
+    pangolin::Var<bool> menuShowTexture("menu.Show Texture", true,true);
     pangolin::Var<bool> menuLocalizationMode("menu.Localization Mode",false,true);
     pangolin::Var<bool> menuReset("menu.Reset",false,false);
 
+
     // Define Camera Render Object (for view / scene browsing)
     pangolin::OpenGlRenderState s_cam(
-                pangolin::ProjectionMatrix(1024,768,mViewpointF,mViewpointF,512,389,0.1,1000),
-                pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0)
+//                pangolin::ProjectionMatrix(1024,768,mViewpointF,mViewpointF,512,389,0.1,1000),
+//                pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0)
+            // carv: using calibrated camera center and focal length
+            pangolin::ProjectionMatrix(mImageWidth,mImageHeight,mfx,mfy,mcx,mcy,0.1,1000),
+            pangolin::ModelViewLookAt(0,0,0, 0,0,1, 0.0,-1.0, 0.0)
                 );
 
     // Add named OpenGL viewport to window and provide 3D Handler
     pangolin::View& d_cam = pangolin::CreateDisplay()
-            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f/768.0f)
+//            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -1024.0f/768.0f)
+            .SetBounds(0.0, 1.0, pangolin::Attach::Pix(175), 1.0, -mImageWidth/mImageHeight)
             .SetHandler(new pangolin::Handler3D(s_cam));
 
     pangolin::OpenGlMatrix Twc;
@@ -92,6 +110,15 @@ void Viewer::Run()
     bool bFollow = true;
     bool bLocalizationMode = false;
 
+    // carv: camera close up view
+    bool bCameraView = true;
+    pangolin::OpenGlMatrix projectionAbove = pangolin::ProjectionMatrix(mImageWidth,mImageHeight,mViewpointF,mViewpointF,
+                                                                        mImageWidth/2,mImageHeight/2,0.1,1000);
+    pangolin::OpenGlMatrix projectionCamera = pangolin::ProjectionMatrix(mImageWidth,mImageHeight,mfx,mfy,mcx,mcy,0.1,1000);
+    pangolin::OpenGlMatrix viewAbove = pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0);
+    pangolin::OpenGlMatrix viewCamera = pangolin::ModelViewLookAt(0,0,0, 0,0,1, 0.0,-1.0, 0.0);
+
+    //int i=0;
     while(1)
     {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -104,7 +131,7 @@ void Viewer::Run()
         }
         else if(menuFollowCamera && !bFollow)
         {
-            s_cam.SetModelViewMatrix(pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0));
+//            s_cam.SetModelViewMatrix(pangolin::ModelViewLookAt(mViewpointX,mViewpointY,mViewpointZ, 0,0,0,0.0,-1.0, 0.0));
             s_cam.Follow(Twc);
             bFollow = true;
         }
@@ -124,19 +151,58 @@ void Viewer::Run()
             bLocalizationMode = false;
         }
 
+        // carv: setup viewpoint to see model
+        if(menuCameraView && !bCameraView)
+        {
+            s_cam.SetProjectionMatrix(projectionCamera);
+            s_cam.SetModelViewMatrix(viewCamera);
+            bCameraView = true;
+        }
+        else if(!menuCameraView && bCameraView)
+        {
+            s_cam.SetProjectionMatrix(projectionAbove);
+            s_cam.SetModelViewMatrix(viewAbove);
+            bCameraView = false;
+        }
+
         d_cam.Activate(s_cam);
         glClearColor(1.0f,1.0f,1.0f,1.0f);
         mpMapDrawer->DrawCurrentCamera(Twc);
         if(menuShowKeyFrames || menuShowGraph)
             mpMapDrawer->DrawKeyFrames(menuShowKeyFrames,menuShowGraph);
-        if(menuShowPoints)
+        if(menuShowPoints){
             mpMapDrawer->DrawMapPoints();
+            mpModelDrawer->DrawModelPoints();
+            }
+        if(menuShowSemiDense)
+            mpMapDrawer->DrawSemiDense(menuSigmaTH);
+
+
+        CheckGlDieOnError()
+        // carv: show model or triangle with light from camera
+        if(menuShowModel && menuShowTexture) {
+            mpModelDrawer->DrawModel(mbRGB);
+            mpModelDrawer->DrawTriangles(Twc);
+        }
+        else if (menuShowModel && !menuShowTexture) {
+            mpModelDrawer->DrawTriangles(Twc);
+        }
+        else if (!menuShowModel && menuShowTexture) {
+            mpModelDrawer->DrawModel(mbRGB);
+        }
+        CheckGlDieOnError()
+
 
         pangolin::FinishFrame();
 
         cv::Mat im = mpFrameDrawer->DrawFrame();
+        cv::resize(im, im, cv::Size(), 0.5, 0.5);
         cv::imshow("ORB-SLAM2: Current Frame",im);
+        //stringstream filename;
+        //filename<<"ImageFrames/"<<"IMG_"<<(i + 1)<<".png";
+        //cv::imwrite(filename.str(),im);
         cv::waitKey(mT);
+        //i++;
 
         if(menuReset)
         {
@@ -149,6 +215,12 @@ void Viewer::Run()
             bLocalizationMode = false;
             bFollow = true;
             menuFollowCamera = true;
+
+            menuShowSemiDense = true;
+            menuCameraView = true;
+            menuShowModel = true;
+            menuShowTexture = true;
+
             mpSystem->Reset();
             menuReset = false;
         }

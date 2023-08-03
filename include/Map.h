@@ -25,10 +25,12 @@
 #include "KeyFrame.h"
 #include <set>
 
+#include "Modeler.h"
+
 #include <mutex>
 
-
-
+class Modeler;
+class Model;
 namespace ORB_SLAM2
 {
 
@@ -40,13 +42,17 @@ class Map
 public:
     Map();
 
+    void SetModeler(Modeler *pModeler);
+    Modeler* GetModeler();
+
     void AddKeyFrame(KeyFrame* pKF);
     void AddMapPoint(MapPoint* pMP);
     void EraseMapPoint(MapPoint* pMP);
     void EraseKeyFrame(KeyFrame* pKF);
     void SetReferenceMapPoints(const std::vector<MapPoint*> &vpMPs);
-    void InformNewBigChange();
-    int GetLastBigChangeIdx();
+
+    void UpdateModel(Model* pModel);
+    Model* GetModel();
 
     std::vector<KeyFrame*> GetAllKeyFrames();
     std::vector<MapPoint*> GetAllMapPoints();
@@ -65,6 +71,7 @@ public:
 
     // This avoid that two points are created simultaneously in separate threads (id conflict)
     std::mutex mMutexPointCreation;
+    KeyFrame* newestKeyFrame{nullptr};
 
 protected:
     std::set<MapPoint*> mspMapPoints;
@@ -74,10 +81,13 @@ protected:
 
     long unsigned int mnMaxKFid;
 
-    // Index related to a big change in the map (loop closure, global BA)
-    int mnBigChangeIdx;
+    Model* mpModel;
+
+    Modeler* mpModeler;
 
     std::mutex mMutexMap;
+
+    int count_keyframes{0};
 };
 
 } //namespace ORB_SLAM

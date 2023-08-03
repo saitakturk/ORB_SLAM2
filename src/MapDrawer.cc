@@ -19,10 +19,13 @@
 */
 
 #include "MapDrawer.h"
+#include "Converter.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
+#include "ProbabilityMapping.h"
 #include <pangolin/pangolin.h>
 #include <mutex>
+#include <iostream>
 
 namespace ORB_SLAM2
 {
@@ -38,7 +41,6 @@ MapDrawer::MapDrawer(Map* pMap, const string &strSettingPath):mpMap(pMap)
     mPointSize = fSettings["Viewer.PointSize"];
     mCameraSize = fSettings["Viewer.CameraSize"];
     mCameraLineWidth = fSettings["Viewer.CameraLineWidth"];
-
 }
 
 void MapDrawer::DrawMapPoints()
@@ -79,6 +81,53 @@ void MapDrawer::DrawMapPoints()
 
     glEnd();
 }
+
+void MapDrawer::DrawSemiDense(const double sigma)
+{
+    const vector<KeyFrame*> &vpKf = mpMap->GetAllKeyFrames();
+    if(vpKf.empty())return;
+
+    glPointSize(mPointSize);
+    glBegin(GL_POINTS);
+    glColor3f(0.0,1.0,0.0);
+
+    int draw_cnt(0);
+    for(size_t i = 0; i < vpKf.size();++i)
+    {
+        KeyFrame* kf = vpKf[i];
+        kf->SetNotEraseDrawer();
+        if( kf->isBad() || !kf->semidense_flag_ || !kf->interKF_depth_flag_) {
+            kf->SetEraseDrawer();
+            continue;
+        }
+
+        unique_lock<mutex> lock(kf->mMutexSemiDensePoints);
+
+        draw_cnt ++;
+        for(int y = 0; y< kf->im_.rows; y++)
+            for(int x = 0; x< kf->im_.cols; x++)
+            {
+                if (kf->depth_sigma_.at<float>(y,x) > sigma) continue;
+
+                if( kf->depth_map_checked_.at<float>(y,x) > 0.000001 )
+                {
+                    Eigen::Vector3f Pw  (kf->SemiDensePointSets_.at<float>(y,3*x),
+                                         kf->SemiDensePointSets_.at<float>(y,3*x+1),
+                                         kf->SemiDensePointSets_.at<float>(y,3*x+2));
+
+                    float b = kf->rgb_.at<uchar>(y, 3*x) / 255.0;
+                    float g = kf->rgb_.at<uchar>(y, 3*x+1) / 255.0;
+                    float r = kf->rgb_.at<uchar>(y, 3*x+2) / 255.0;
+                    glColor3f(r, g, b);
+
+                    glVertex3f( Pw[0],Pw[1],Pw[2]);
+                }
+            }
+        kf->SetEraseDrawer();
+    }
+    glEnd();
+}
+
 
 void MapDrawer::DrawKeyFrames(const bool bDrawKF, const bool bDrawGraph)
 {
@@ -259,6 +308,37 @@ void MapDrawer::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M)
     }
     else
         M.SetIdentity();
+    //mpModeler->mvpMapTwc.push_back(M);
+    
+    
+}
+cv::Mat MapDrawer::GetCurrentCameraMatrix()
+{
+    cv::Mat invCamPose=cv::Mat::eye(4,4,CV_64F);
+
+    if(!mCameraPose.empty())
+    {
+        cv::Mat Rwc(3,3,CV_32F);
+        cv::Mat twc(3,1,CV_32F);
+        {
+            unique_lock<mutex> lock(mMutexCamera);
+            Rwc = mCameraPose.rowRange(0,3).colRange(0,3).t(); //* invDepth;
+            twc = -Rwc*mCameraPose.rowRange(0,3).col(3);
+        }
+       
+        cv::hconcat(Rwc,twc,invCamPose);
+    }
+
+    auto pose = invCamPose;
+    std::vector<float> TWC = ORB_SLAM2::Converter::toQuaternion(pose) ;//return TWC
+    cv::Mat Rcw = pose.rowRange(0,3).colRange(0,3);
+    cv::Mat tcw = pose.rowRange(0,3).col(3);
+    cv::Mat Rwc = Rcw.t();
+    cv::Mat center = -Rwc*tcw;
+    
+    std::cout << "camera center : " << center << "pose :" << pose << "Rcw :" << Rcw  << "tcw :" << tcw << std::endl;
+
+    return invCamPose;
 }
 
 } //namespace ORB_SLAM

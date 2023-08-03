@@ -20,21 +20,62 @@
 
 #include "Map.h"
 
-#include<mutex>
-
+#include <mutex>
+#include <thread>
+#include <fstream>
+#include "Modeler.h"
 namespace ORB_SLAM2
 {
 
-Map::Map():mnMaxKFid(0),mnBigChangeIdx(0)
+Map::Map():mnMaxKFid(0),mpModel(NULL)
 {
+}
+
+void Map::SetModeler(Modeler *pModeler)
+{
+    mpModeler=pModeler;
+}
+
+Modeler* Map::GetModeler()
+{
+    return mpModeler;
 }
 
 void Map::AddKeyFrame(KeyFrame *pKF)
 {
     unique_lock<mutex> lock(mMutexMap);
+    pKF->id = count_keyframes++;
+    std::thread t([pKF](){
+        cv::Mat img;
+        cv::flip(pKF->rgb_, img, 1);
+        cv::imwrite("./ObjectFiles/carv/materials/textures/" + std::to_string(pKF->id) + ".jpg", img);
+         ofstream outfile;
+        //write texture model to text file
+        string filename = "ObjectFiles/carv/meshes/texture" + std::to_string(pKF->id) + ".mtl";
+        outfile.open(filename.c_str());
+        outfile << "newmtl material" << pKF->id << std::endl;
+        outfile << "Ns 10.0000" << std::endl;
+        outfile << "Ni 1.5000" << std::endl;
+        outfile << "d 1.0000" << std::endl;
+        outfile << "Tr 0.0000" << std::endl;
+        outfile << "Tf 1.0000 1.0000 1.0000" << std::endl;
+        outfile << "illum 2" << std::endl;
+        outfile << "Ka 0.5882 0.5882 0.5882" << std::endl;
+        outfile << "Kd 0.5882 0.5882 0.5882" << std::endl;
+        outfile << "Ks 0.0000 0.0000 0.0000" << std::endl;
+        outfile << "Ke 0.0000 0.0000 0.0000" << std::endl;
+        outfile << "map_Ka " << std::to_string(pKF->id) << ".jpg" << std::endl;
+        outfile << "map_Kd " << std::to_string(pKF->id) << ".jpg" << std::endl;
+
+        outfile.close();
+    });
+
+    t.detach();
+
     mspKeyFrames.insert(pKF);
     if(pKF->mnId>mnMaxKFid)
         mnMaxKFid=pKF->mnId;
+    newestKeyFrame = pKF;
 }
 
 void Map::AddMapPoint(MapPoint *pMP)
@@ -65,18 +106,6 @@ void Map::SetReferenceMapPoints(const vector<MapPoint *> &vpMPs)
 {
     unique_lock<mutex> lock(mMutexMap);
     mvpReferenceMapPoints = vpMPs;
-}
-
-void Map::InformNewBigChange()
-{
-    unique_lock<mutex> lock(mMutexMap);
-    mnBigChangeIdx++;
-}
-
-int Map::GetLastBigChangeIdx()
-{
-    unique_lock<mutex> lock(mMutexMap);
-    return mnBigChangeIdx;
 }
 
 vector<KeyFrame*> Map::GetAllKeyFrames()
@@ -128,6 +157,28 @@ void Map::clear()
     mnMaxKFid = 0;
     mvpReferenceMapPoints.clear();
     mvpKeyFrameOrigins.clear();
+
+    if(mpModel != NULL)
+        mpModel->Release();
+    mpModel = NULL;
+}
+
+void Map::UpdateModel(Model* pModel)
+{
+    Model* pModelPrev;
+    {
+        unique_lock<mutex> lock(mMutexMap);
+        pModelPrev = mpModel;
+        mpModel = pModel;
+    }
+    if(pModelPrev != NULL)
+        pModelPrev->Release();
+}
+
+Model* Map::GetModel()
+{
+    unique_lock<mutex> lock(mMutexMap);
+    return mpModel;
 }
 
 } //namespace ORB_SLAM

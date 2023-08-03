@@ -26,10 +26,12 @@
 #include "LoopClosing.h"
 #include "Tracking.h"
 #include "KeyFrameDatabase.h"
+#include "ProbabilityMapping.h"
+#include "Modeler.h"
 
 #include <mutex>
-
-
+class ProbabilityMapping;
+class Modeler;
 namespace ORB_SLAM2
 {
 
@@ -71,6 +73,8 @@ public:
         unique_lock<std::mutex> lock(mMutexNewKFs);
         return mlNewKeyFrames.size();
     }
+    void SetSemiDenseMapping(ProbabilityMapping *pSemiDenseMapping);
+    void SetModeler(Modeler *pModeler);
 
 protected:
 
@@ -82,7 +86,7 @@ protected:
     void SearchInNeighbors();
 
     void KeyFrameCulling();
-
+    
     cv::Mat ComputeF12(KeyFrame* &pKF1, KeyFrame* &pKF2);
 
     cv::Mat SkewSymmetricMatrix(const cv::Mat &v);
@@ -121,6 +125,9 @@ protected:
 
     bool mbAcceptKeyFrames;
     std::mutex mMutexAccept;
+    ProbabilityMapping* mpSemiDenseMapping;
+    Modeler* mpModeler;
+
 };
 
 } //namespace ORB_SLAM

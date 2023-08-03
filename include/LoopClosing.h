@@ -47,7 +47,7 @@ public:
 
     typedef pair<set<KeyFrame*>,int> ConsistentGroup;    
     typedef map<KeyFrame*,g2o::Sim3,std::less<KeyFrame*>,
-        Eigen::aligned_allocator<std::pair<const KeyFrame*, g2o::Sim3> > > KeyFrameAndPose;
+    Eigen::aligned_allocator<std::pair<KeyFrame* const, g2o::Sim3> > > KeyFrameAndPose;
 
 public:
 
@@ -79,8 +79,6 @@ public:
     void RequestFinish();
 
     bool isFinished();
-
-    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 protected:
 
@@ -141,9 +139,6 @@ protected:
 
     // Fix scale in the stereo/RGB-D case
     bool mbFixScale;
-
-
-    bool mnFullBAIdx;
 };
 
 } //namespace ORB_SLAM

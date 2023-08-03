@@ -22,6 +22,7 @@
 #define KEYFRAME_H
 
 #include "MapPoint.h"
+#include "ProbabilityMapping.h"
 #include "Thirdparty/DBoW2/DBoW2/BowVector.h"
 #include "Thirdparty/DBoW2/DBoW2/FeatureVector.h"
 #include "ORBVocabulary.h"
@@ -31,6 +32,8 @@
 
 #include <mutex>
 
+
+class EdgeMap;
 
 namespace ORB_SLAM2
 {
@@ -44,6 +47,8 @@ class KeyFrame
 {
 public:
     KeyFrame(Frame &F, Map* pMap, KeyFrameDatabase* pKFDB);
+
+    ~KeyFrame();
 
     // Pose functions
     void SetPose(const cv::Mat &Tcw);
@@ -116,10 +121,73 @@ public:
         return pKF1->mnId<pKF2->mnId;
     }
 
+    // used in semidense mapping
+    cv::Mat GetImage();
+    cv::KeyPoint GetKeyPointUn(const size_t &idx) const;
+    int GetKeyPointScaleLevel(const size_t &idx) const;
+    cv::Mat GetDescriptor(const size_t &idx);
+    cv::Mat GetDescriptors();
+    vector< cv::KeyPoint > GetKeyPoints() const;
+    vector< cv::KeyPoint > GetKeyPointsUn() const;
+    cv::Mat GetCalibrationMatrix() const;
+    DBoW2::FeatureVector GetFeatureVector();
+    std::vector<float> GetAllPointDepths(); //modeled after: float ComputeSceneMedianDepth(int q = 2);
+    bool MappingIdDelay();
+    void IncreaseMappingId();
+    bool Mapped();
+    bool PoseChanged();
+    void SetPoseChanged(bool bChanged);
+    void Release();
+    // Enable/Disable bad flag changes from semi dense thread
+    void SetNotEraseSemiDense();
+    void SetEraseSemiDense();
+    // Enable/Disable bad flag changes from viewer thread
+    void SetNotEraseDrawer();
+    void SetEraseDrawer();
+    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
 
-    // The following variables are accesed from only 1 thread or never change (no mutex needed).
+    // for drawing model
+    vector<float> GetTexCoordinate(float x, float y, float z);
+    std::vector<cv::Mat> GetPlaneCloud(int i);
+    int id{0};
+
 public:
+/***********semi dense*******************************/
+    // img used to semidense
+    cv::Mat im_;
+    cv::Mat rgb_;
+    bool semidense_flag_;  // whether this frame have build dense map or not?
+    bool interKF_depth_flag_; // for inter kf depth check
+    cv::Mat GradImg,GradTheta;
+    float I_stddev;
+    cv::Mat depth_map_;
+    cv::Mat depth_sigma_;
+    cv::Mat depth_map_checked_;
+    bool poseChanged;
+    std::mutex mMutexSemiDensePoints;
+    cv::Mat SemiDensePointSets_;
+    static long unsigned int nNextMappingId;
+    long unsigned int mnMappingId;
+    std::mutex mMutexMappingId;
+    cv::Mat mLines; // line segments, each row: (sx, sy, ex, ey)
+    cv::Mat mLineIndex; // segment correspondence index for each pixel (integers, init: -1)
+    cv::Mat mLinesSeg; // line segments given by depth and pixel: (sx, sy, ex, ey)
+	cv::Mat mLines3D; // 3D line segments, each row: (sx, sy, sz, ex, ey, ez)
+    cv::Mat mEdgeIndex; // edge chains correspondence index for each pixel (integers, init: -1)
+    std::vector<pair<int,int>> mPixelIndex;
+    bool line3D_flag;
+    bool mTranscriptFlag;
+    EdgeMap* mEdgeMap;
+    //Plane parameters
+    std::vector<cv::Vec4f> mPlanes;
+    std::vector<bool> mValidPlane;
+    std::vector<cv::Point3d> mPlaneNormals;
+    std::vector<pair<int,int>> mPlaneLines;
 
+
+
+/******************************************/
+    //
     static long unsigned int nNextId;
     long unsigned int mnId;
     const long unsigned int mnFrameId;
@@ -222,7 +290,11 @@ protected:
     // Bad flags
     bool mbNotErase;
     bool mbToBeErased;
-    bool mbBad;    
+    bool mbBad;
+
+    // semi dense: erase flags for different threads
+    bool mbNotEraseSemiDense;
+    bool mbNotEraseDrawer;
 
     float mHalfBaseline; // Only for visualization
 

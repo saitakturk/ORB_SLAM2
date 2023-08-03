@@ -1,10 +1,27 @@
-##List of Known Dependencies
-###ORB-SLAM2 version 1.0
+## List of Known Dependencies
+
+In this repo, other than the dependencies of ORB-SLAM2 described below, we include [EdgeDrawing](http://ceng.anadolu.edu.tr/CV/EdgeDrawing/) edge detection library in Thirdparty/EDTest folder. 
+
+[EDLines](http://ceng.anadolu.edu.tr/cv/EDLines/) line detection library is included in Thirdparty/EDLines folder.
+
+[Line3D++](https://github.com/manhofer/Line3Dpp) line-based MVS library is included in Thirdparty/Line3Dpp folder.
+
+We also use [CGAL](https://www.cgal.org) in the process of surface reconstruction.
+
+The implementation of semi-dense mapping is modified from this [github repo](https://github.com/HeYijia/ORB_SLAM2).
+
+The surface reconstruction is modified from the work of David Lovi, which is described in [his thesis](https://era.library.ualberta.ca/items/0d2079b7-4a6d-47c6-8528-87478dbab309).
+
+[OpenMP](https://www.openmp.org/) is used for speeding up the semi-dense mapping a little.
+
+[Boost](https://www.boost.org/) is also used to make things easier.
+
+
+### ORB-SLAM2 version 1.0
 
 In this document we list all the pieces of code included  by ORB-SLAM2 and linked libraries which are not property of the authors of ORB-SLAM2.
 
-
-#####Code in **src** and **include** folders
+##### Code in **src** and **include** folders
 
 * *ORBextractor.cc*.
 This is a modified version of orb.cpp of OpenCV library. The original code is BSD licensed.
@@ -17,7 +34,7 @@ This code can be found in popular BSD licensed computer vision libraries as [Ope
 The code is from: http://graphics.stanford.edu/~seander/bithacks.html#CountBitsSetParallel.
 The code is in the public domain.
 
-#####Code in Thirdparty folder
+##### Code in Thirdparty folder
 
 * All code in **DBoW2** folder.
 This is a modified version of [DBoW2](https://github.com/dorian3d/DBoW2) and [DLib](https://github.com/dorian3d/DLib) library. All files included are BSD licensed.
@@ -25,20 +42,26 @@ This is a modified version of [DBoW2](https://github.com/dorian3d/DBoW2) and [DL
 * All code in **g2o** folder.
 This is a modified version of [g2o](https://github.com/RainerKuemmerle/g2o). All files included are BSD licensed.
 
-#####Library dependencies 
+##### Library dependencies 
 
 * **Pangolin (visualization and user interface)**.
-[MIT license](https://en.wikipedia.org/wiki/MIT_License).
+https://github.com/stevenlovegrove/Pangolin
 
 * **OpenCV**.
-BSD license.
+BSD licensed.
 
 * **Eigen3**.
 For versions greater than 3.1.1 is MPL2, earlier versions are LGPLv3.
 
+* **BLAS** (required by g2o).
+[Freely-available software](http://www.netlib.org/blas/#_licensing).
+
+* **LAPACK**(required by g2o).
+BSD licensed. 
+
 * **ROS (Optional, only if you build Examples/ROS)**.
-BSD license. In the manifest.xml the only declared package dependencies are roscpp, tf, sensor_msgs, image_transport, cv_bridge, which are all BSD licensed.
+BSD licensed. In the manifest.xml the only declared package dependencies are roscpp, tf, sensor_msgs, image_transport, cv_bridge, which are all BSD licensed.
 
 
 
-
+Updated: 23/01/2016 Raúl Mur Artal

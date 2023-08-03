@@ -59,15 +59,15 @@ int main(int argc, char **argv)
 
     cout << endl << "-------" << endl;
     cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;   
+    cout << "Images in the sequence: " << nImages << endl << endl;
 
     // Main loop
     cv::Mat imLeft, imRight;
     for(int ni=0; ni<nImages; ni++)
     {
         // Read left and right images from file
-        imLeft = cv::imread(vstrImageLeft[ni],CV_LOAD_IMAGE_UNCHANGED);
-        imRight = cv::imread(vstrImageRight[ni],CV_LOAD_IMAGE_UNCHANGED);
+        imLeft = cv::imread(vstrImageLeft[ni],cv::IMREAD_UNCHANGED);
+        imRight = cv::imread(vstrImageRight[ni],cv::IMREAD_UNCHANGED);
         double tframe = vTimestamps[ni];
 
         if(imLeft.empty())
@@ -84,7 +84,7 @@ int main(int argc, char **argv)
 #endif
 
         // Pass the images to the SLAM system
-        SLAM.TrackStereo(imLeft,imRight,tframe);
+        SLAM.TrackStereo(imLeft,imRight,tframe);        
 
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
