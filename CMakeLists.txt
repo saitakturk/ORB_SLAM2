@@ -51,6 +51,20 @@ if (OPENMP_FOUND)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 endif()
 
+find_package(catkin REQUIRED)
+
+include_directories(${catkin_INCLUDE_DIRS})
+
+## System dependencies are found with CMake's conventions
+# find_package(Boost REQUIRED COMPONENTS system)
+find_package(catkin REQUIRED COMPONENTS 
+  roscpp
+  rospy
+  std_msgs
+  geometry_msgs
+  message_generation
+)
+
 # Find CGAL
 set(CMAKE_BUILD_TYPE_BACKUP ${CMAKE_BUILD_TYPE})
 set(CMAKE_BUILD_TYPE "Release")

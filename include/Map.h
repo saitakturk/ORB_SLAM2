@@ -74,6 +74,9 @@ public:
     std::mutex mMutexPointCreation;
     KeyFrame* newestKeyFrame{nullptr};
 
+    int GetLastBigChangeIdx();
+    void InformNewBigChange();
+
 protected:
     std::set<MapPoint*> mspMapPoints;
     std::set<KeyFrame*> mspKeyFrames;
@@ -81,6 +84,7 @@ protected:
     std::vector<MapPoint*> mvpReferenceMapPoints;
 
     long unsigned int mnMaxKFid;
+    int mnBigChangeIdx;
 
     Model* mpModel;
 

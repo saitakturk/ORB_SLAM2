@@ -1073,10 +1073,8 @@ void KeyFrame::serialize(Archive &ar, const unsigned int version)
     ar & mpMap;
     // don't save mutex
 }
+
 template void KeyFrame::serialize(boost::archive::binary_iarchive&, const unsigned int);
 template void KeyFrame::serialize(boost::archive::binary_oarchive&, const unsigned int);
-
-} //namespace ORB_SLAM
-
 
 } //namespace ORB_SLAM

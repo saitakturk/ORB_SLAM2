@@ -1,0 +1,116 @@
+Configuring and building Thirdparty/DBoW2 ...
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/rowley/team_members_private_directories/sait/ORB_SLAM2/Thirdparty/DBoW2/build
+[100%] Built target DBoW2
+Configuring and building Thirdparty/g2o ...
+-- BUILD TYPE:Release
+-- Compiling on Unix
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/rowley/team_members_private_directories/sait/ORB_SLAM2/Thirdparty/g2o/build
+[100%] Built target g2o
+Uncompress vocabulary ...
+Configuring and building ORB_SLAM2 ...
+-- The C compiler identification is GNU 9.4.0
+-- The CXX compiler identification is GNU 9.4.0
+-- Check for working C compiler: /usr/bin/cc
+-- Check for working C compiler: /usr/bin/cc -- works
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Check for working CXX compiler: /usr/bin/c++
+-- Check for working CXX compiler: /usr/bin/c++ -- works
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test COMPILER_SUPPORTS_CXX11
+-- Performing Test COMPILER_SUPPORTS_CXX11 - Success
+-- Performing Test COMPILER_SUPPORTS_CXX0X
+-- Performing Test COMPILER_SUPPORTS_CXX0X - Success
+-- Using flag -std=c++14.
+-- Using opencv version 4.2.0
+-- Found Eigen3: /usr/local/include/eigen3 (Required is at least version "3.1.0") 
+-- Found OpenMP_C: -fopenmp (found version "4.5") 
+-- Found OpenMP_CXX: -fopenmp (found version "4.5") 
+-- Found OpenMP: TRUE (found version "4.5")  
+-- Using CATKIN_DEVEL_PREFIX: /home/rowley/team_members_private_directories/sait/ORB_SLAM2/build/devel
+-- Using CMAKE_PREFIX_PATH: /home/rowley/Downloads/stcarv/Examples/ROS/ORB_SLAM2/build/devel;/home/rowley/catkin_ws-Faezeh/devel;/home/rowley/catkin_workspace/devel;/opt/ros/noetic
+-- This workspace overlays: /home/rowley/Downloads/stcarv/Examples/ROS/ORB_SLAM2/build/devel;/home/rowley/catkin_ws-Faezeh/devel;/home/rowley/catkin_workspace/devel;/opt/ros/noetic
+-- Found PythonInterp: /usr/bin/python3 (found suitable version "3.8.10", minimum required is "3") 
+-- Using PYTHON_EXECUTABLE: /usr/bin/python3
+-- Using Debian Python package layout
+-- Found PY_em: /usr/lib/python3/dist-packages/em.py  
+-- Using empy: /usr/lib/python3/dist-packages/em.py
+-- Using CATKIN_ENABLE_TESTING: ON
+-- Call enable_testing()
+-- Using CATKIN_TEST_RESULTS_DIR: /home/rowley/team_members_private_directories/sait/ORB_SLAM2/build/test_results
+-- Forcing gtest/gmock from source, though one was otherwise available.
+-- Found gtest sources under '/usr/src/googletest': gtests will be built
+-- Found gmock sources under '/usr/src/googletest': gmock will be built
+-- Found PythonInterp: /usr/bin/python3 (found version "3.8.10") 
+-- Found Threads: TRUE  
+-- Using Python nosetests: /usr/bin/nosetests3
+-- catkin 0.8.10
+-- BUILD_SHARED_LIBS is on
+-- Using these message generators: gencpp;geneus;genlisp;gennodejs;genpy
+-- Using header-only CGAL
+-- Targetting Unix Makefiles
+-- Using /usr/bin/c++ compiler.
+-- Found GMP: /usr/lib/x86_64-linux-gnu/libgmp.so  
+-- Found MPFR: /usr/lib/x86_64-linux-gnu/libmpfr.so  
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.71.0/BoostConfig.cmake (found suitable version "1.71.0", minimum required is "1.48")  
+-- Boost include dirs: /usr/include
+-- Boost libraries:    
+-- Using gcc version 4 or later. Adding -frounding-math
+-- Build type: Release
+-- USING CXXFLAGS = '-Wall -Wextra -pedantic -Wall   -O3 -march=native  -Wno-unused-function  -Wno-return-type -D__STDC_CONSTANT_MACROS -DGL_GLEXT_PROTOTYPES -D_LINUX -D_REENTRANT -DCGAL_USE_F2C -DCGAL_DISABLE_ROUNDING_MATH_CHECK -std=c++14 -fopenmp -O3 -DNDEBUG'
+-- USING EXEFLAGS = ' '
+-- Requested component: Core
+-- Requested component: MPFR
+-- Requested component: GMP
+-- Found Boost: /usr/lib/x86_64-linux-gnu/cmake/Boost-1.71.0/BoostConfig.cmake (found version "1.71.0")  
+-- Looking for sgemm_
+-- Looking for sgemm_ - not found
+-- Looking for dgemm_
+-- Looking for dgemm_ - found
+-- Found BLAS: /usr/lib/x86_64-linux-gnu/libf77blas.so;/usr/lib/x86_64-linux-gnu/libatlas.so  
+-- Looking for cheev_
+-- Looking for cheev_ - not found
+-- Looking for cheev_
+-- Looking for cheev_ - found
+-- A library with LAPACK API found.
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/rowley/team_members_private_directories/sait/ORB_SLAM2/build
+Scanning dependencies of target ORB_SLAM2
+[  4%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Tracking.cc.o
+[  4%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/System.cc.o
+[  6%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/LocalMapping.cc.o
+[  8%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/LoopClosing.cc.o
+[ 10%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/ORBextractor.cc.o
+[ 12%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/ORBmatcher.cc.o
+[ 14%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/FrameDrawer.cc.o
+[ 16%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/KeyFrame.cc.o
+[ 20%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/MapPoint.cc.o
+[ 20%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Converter.cc.o
+[ 24%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/PnPsolver.cc.o
+[ 24%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Optimizer.cc.o
+[ 26%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Map.cc.o
+[ 28%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/MapDrawer.cc.o
+[ 30%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Frame.cc.o
+[ 32%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/KeyFrameDatabase.cc.o
+[ 34%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Initializer.cc.o
+[ 36%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Viewer.cc.o
+[ 38%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/ProbabilityMapping.cc.o
+[ 40%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Sim3Solver.cc.o
+[ 42%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/Modeler.cc.o
+[ 44%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/PlaneExtractor.cc.o
+[ 46%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/LineDetector.cc.o
+[ 48%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/CARV/FreespaceDelaunayAlgorithm.cc.o
+[ 51%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/CARV/GraphWrapper_Boost.cc.o
+[ 53%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/CARV/lovimath.cc.o
+[ 55%] Building CXX object CMakeFiles/ORB_SLAM2.dir/src/CARV/SFMTranscript.cpp.o
+Converting vocabulary to binary

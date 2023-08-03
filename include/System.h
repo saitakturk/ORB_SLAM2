@@ -30,6 +30,7 @@
 
 
 #include "Tracking.h"
+#include "MapDrawer.h"
 #include "FrameDrawer.h"
 #include "Map.h"
 #include "LocalMapping.h"
@@ -45,7 +46,9 @@ class Modeler;
 class ModelDrawer;
 namespace ORB_SLAM2
 {
+
 class FrameDrawer;
+class Viewer;
 class Map;
 class Tracking;
 class LocalMapping;
@@ -125,7 +128,6 @@ public:
     // SaveMap(const string &filename);
     // LoadMap(const string &filename);
     Modeler* mpModeler;
-    Map* mpMap;
     MapDrawer* mpMapDrawer;
 
 
@@ -145,7 +147,10 @@ public:
 
     std::vector<MapPoint*> GetAllMapPoints();
 
-private:
+        // KeyFrame database for place recognition (relocalization and loop detection).
+    KeyFrameDatabase* mpKeyFrameDatabase;
+
+
     bool SetCallStackSize (const rlim_t kNewStackSize);
 
     rlim_t GetCurrentCallStackSize ();
@@ -170,8 +175,7 @@ private:
     // ORB vocabulary used for place recognition and feature matching.
     ORBVocabulary* mpVocabulary;
 
-    // KeyFrame database for place recognition (relocalization and loop detection).
-    KeyFrameDatabase* mpKeyFrameDatabase;
+
 
     // Map structure that stores the pointers to all KeyFrames and MapPoints.
     Map* mpMap;
@@ -193,7 +197,7 @@ private:
     LoopClosing* mpLoopCloser;
 
     // The viewer draws the map and the current camera pose. It uses Pangolin.
-    Viewer* mpViewer;
+    //fViewer* mpViewer;
 
     FrameDrawer* mpFrameDrawer;
 
