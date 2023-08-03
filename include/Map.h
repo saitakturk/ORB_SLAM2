@@ -23,6 +23,7 @@
 
 #include "MapPoint.h"
 #include "KeyFrame.h"
+#include "BoostArchiver.h"
 #include <set>
 
 #include "Modeler.h"
@@ -88,6 +89,13 @@ protected:
     std::mutex mMutexMap;
 
     int count_keyframes{0};
+
+// map serialization addition
+private:
+    // serialize is recommended to be private
+    friend class boost::serialization::access;
+    template<class Archive>
+    void serialize(Archive &ar, const unsigned int version);
 };
 
 } //namespace ORB_SLAM
