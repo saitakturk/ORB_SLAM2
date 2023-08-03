@@ -23,16 +23,16 @@
 #include "System.h"
 #include "Converter.h"
 #include <thread>
-#include <pangolin/pangolin.h>
 #include <iomanip>
 #include "Modeler.h"
 
 namespace ORB_SLAM2
 {
 
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer):mSensor(sensor),mbReset(false),mbActivateLocalizationMode(false),
-        mbDeactivateLocalizationMode(false)
+System::System(const string strVocFile, const eSensor sensor, ORBParameters& parameters,
+               const std::string & map_file, bool load_map): // map serialization addition
+               mSensor(sensor), mbReset(false),mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false),
+               map_file(map_file), load_map(load_map)
 {
     // Output welcome message
     cout << endl <<
@@ -40,6 +40,11 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     "This program comes with ABSOLUTELY NO WARRANTY;" << endl  <<
     "This is free software, and you are welcome to redistribute it" << endl <<
     "under certain conditions. See LICENSE.txt." << endl << endl;
+
+    cout << "OpenCV version : " << CV_VERSION << endl;
+    cout << "Major version : " << CV_MAJOR_VERSION << endl;
+    cout << "Minor version : " << CV_MINOR_VERSION << endl;
+    cout << "Subminor version : " << CV_SUBMINOR_VERSION << endl;
 
     cout << "Input sensor was set to: ";
 
@@ -50,49 +55,57 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     else if(mSensor==RGBD)
         cout << "RGB-D" << endl;
 
-    //Check settings file
-    cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
-    if(!fsSettings.isOpened())
-    {
-       cerr << "Failed to open settings file at: " << strSettingsFile << endl;
-       exit(-1);
-    }
-
-
     //Load ORB Vocabulary
-    cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
+    cout << endl << "Loading ORB Vocabulary." << endl;
 
     mpVocabulary = new ORBVocabulary();
-    //bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
-    bool bVocLoad = mpVocabulary->loadFromBinaryFile(strVocFile);
+
+    //try to load from the binary file
+    bool bVocLoad = mpVocabulary->loadFromBinFile(strVocFile+".bin");
+
     if(!bVocLoad)
     {
-        cerr << "Wrong path to vocabulary. " << endl;
-        cerr << "Falied to open at: " << strVocFile << endl;
-        exit(-1);
+        cerr << "Cannot find binary file for vocabulary. " << endl;
+        cerr << "Failed to open at: " << strVocFile+".bin" << endl;
+        cerr << "Trying to open the text file. This could take a while..." << endl;
+        bool bVocLoad2 = mpVocabulary->loadFromTextFile(strVocFile);
+        if(!bVocLoad2)
+        {
+            cerr << "Wrong path to vocabulary. " << endl;
+            cerr << "Failed to open at: " << strVocFile << endl;
+            exit(-1);
+        }
+        cerr << "Saving the vocabulary to binary for the next time to " << strVocFile+".bin" << endl;
+        mpVocabulary->saveToBinFile(strVocFile+".bin");
     }
+
     cout << "Vocabulary loaded!" << endl << endl;
 
-    //Create KeyFrame Database
-    mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
+    // begin map serialization addition
+    // load serialized map
+    if (load_map && LoadMap(map_file)) {
+        std::cout << "Using loaded map with " << mpMap->MapPointsInMap() << " points\n" << std::endl;
+    }
+    else {
+        //Create KeyFrame Database
+        mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
 
-    //Create the Map
-    mpMap = new Map();
-
-    
+        //Create the Map
+        mpMap = new Map();
+    }
+    // end map serialization addition
 
     //Model Drawer
     mpModelDrawer = new ModelDrawer();
     mpModeler = new Modeler(mpModelDrawer);
-     
+
     //Create Drawers. These are used by the Viewer
     mpFrameDrawer = new FrameDrawer(mpMap);
-    mpMapDrawer = new MapDrawer(mpMap, strSettingsFile);
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
-    mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-                             mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
+    mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer,
+                             mpMap, mpKeyFrameDatabase, mSensor, parameters);
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
@@ -130,6 +143,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mpLoopCloser->SetTracker(mpTracker);
     mpLoopCloser->SetLocalMapper(mpLocalMapper);
 
+    currently_localizing_only_ = false;
     //CARV: Set pointer of Modeler
     mpMap->SetModeler(mpModeler);
     mpTracker->SetModeler(mpModeler);
@@ -138,13 +152,13 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
 }
 
-cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
+void System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)
 {
     if(mSensor!=STEREO)
     {
         cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << endl;
         exit(-1);
-    }   
+    }
 
     // Check mode change
     {
@@ -156,7 +170,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                usleep(1000);
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -180,16 +194,22 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
     }
     }
 
-    return mpTracker->GrabImageStereo(imLeft,imRight,timestamp);
+    cv::Mat Tcw = mpTracker->GrabImageStereo(imLeft,imRight,timestamp);
+
+    unique_lock<mutex> lock2(mMutexState);
+    mTrackingState = mpTracker->mState;
+    mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+    mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    current_position_ = Tcw;
 }
 
-cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp)
+void System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const double &timestamp)
 {
     if(mSensor!=RGBD)
     {
         cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
         exit(-1);
-    }    
+    }
 
     // Check mode change
     {
@@ -201,7 +221,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                usleep(1000);
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -225,10 +245,16 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     }
     }
 
-    return mpTracker->GrabImageRGBD(im,depthmap,timestamp);
+    cv::Mat Tcw = mpTracker->GrabImageRGBD(im,depthmap,timestamp);
+
+    unique_lock<mutex> lock2(mMutexState);
+    mTrackingState = mpTracker->mState;
+    mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+    mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    current_position_ = Tcw;
 }
 
-cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
+void System::TrackMonocular(const cv::Mat &im, const double &timestamp)
 {
     if(mSensor!=MONOCULAR)
     {
@@ -246,7 +272,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                usleep(1000);
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -270,12 +296,14 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     }
     }
 
-    // wait for semi dense thread
-    {
-        //unique_lock<mutex> lock(mpSemiDenseMapping->mMutexSemiDense);
-    }
+    cv::Mat Tcw = mpTracker->GrabImageMonocular(im,timestamp);
 
-    return mpTracker->GrabImageMonocular(im,timestamp);
+    unique_lock<mutex> lock2(mMutexState);
+    mTrackingState = mpTracker->mState;
+    mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
+    mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+
+    current_position_ = Tcw;
 }
 
 void System::ActivateLocalizationMode()
@@ -284,10 +312,30 @@ void System::ActivateLocalizationMode()
     mbActivateLocalizationMode = true;
 }
 
+
+bool System::MapChanged()
+{
+    static int n=0;
+    int curn = mpMap->GetLastBigChangeIdx();
+    if(n<curn)
+    {
+        n=curn;
+        return true;
+    }
+    else
+        return false;
+}
+
 void System::DeactivateLocalizationMode()
 {
     unique_lock<mutex> lock(mMutexMode);
     mbDeactivateLocalizationMode = true;
+}
+
+
+bool System::isRunningGBA()
+{
+    return  mpLoopCloser->isRunningGBA();
 }
 
 void System::Reset()
@@ -300,24 +348,25 @@ void System::Shutdown()
 {
     mpLocalMapper->RequestFinish();
     mpLoopCloser->RequestFinish();
-    if(mpViewer){
-    mpViewer->RequestFinish();
+    //maybe?
     mpModeler->RequestFinish();}
     mpSemiDenseMapping->RequestFinish();
-
     // Wait until all thread have effectively stopped
     while(!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished()  ||
-          !mpViewer->isFinished()      || mpLoopCloser->isRunningGBA() || !mpSemiDenseMapping->isFinished() || !mpModeler->isFinished())
+          mpLoopCloser->isRunningGBA() || !mpSemiDenseMapping->isFinished() || !mpModeler->isFinished())
     {
-        usleep(5000);
+        std::this_thread::sleep_for(std::chrono::microseconds(5000));
     }
-
-    pangolin::BindToContext("ORB-SLAM2: Map Viewer");
 }
 
 void System::SaveTrajectoryTUM(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    if(mSensor==MONOCULAR)
+    {
+        cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
+        return;
+    }
 
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
@@ -410,6 +459,11 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 void System::SaveTrajectoryKITTI(const string &filename)
 {
     cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    if(mSensor==MONOCULAR)
+    {
+        cerr << "ERROR: SaveTrajectoryKITTI cannot be used for monocular." << endl;
+        return;
+    }
 
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
@@ -455,6 +509,194 @@ void System::SaveTrajectoryKITTI(const string &filename)
     }
     f.close();
     cout << endl << "trajectory saved!" << endl;
+}
+
+void System::SetMinimumKeyFrames (int min_num_kf) {
+  mpTracker->SetMinimumKeyFrames(min_num_kf);
+}
+
+cv::Mat System::GetCurrentPosition () {
+  return current_position_;
+}
+
+int System::GetTrackingState()
+{
+    unique_lock<mutex> lock(mMutexState);
+    return mTrackingState;
+}
+
+vector<MapPoint*> System::GetTrackedMapPoints()
+{
+    unique_lock<mutex> lock(mMutexState);
+    return mTrackedMapPoints;
+}
+
+vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
+{
+    unique_lock<mutex> lock(mMutexState);
+    return mTrackedKeyPointsUn;
+}
+
+cv::Mat System::DrawCurrentFrame () {
+  return mpFrameDrawer->DrawFrame();
+}
+
+std::vector<MapPoint*> System::GetAllMapPoints() {
+  return mpMap->GetAllMapPoints();
+}
+
+
+bool System::SetCallStackSize (const rlim_t kNewStackSize) {
+    struct rlimit rlimit;
+    int operation_result;
+
+    operation_result = getrlimit(RLIMIT_STACK, &rlimit);
+    if (operation_result != 0) {
+        std::cerr << "Error getting the call stack struct" << std::endl;
+        return false;
+    }
+
+    if (kNewStackSize > rlimit.rlim_max) {
+        std::cerr << "Requested call stack size too large" << std::endl;
+        return false;
+    }
+
+    if (rlimit.rlim_cur <= kNewStackSize) {
+        rlimit.rlim_cur = kNewStackSize;
+        operation_result = setrlimit(RLIMIT_STACK, &rlimit);
+        if (operation_result != 0) {
+            std::cerr << "Setrlimit returned result: " << operation_result << std::endl;
+            return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+
+rlim_t System::GetCurrentCallStackSize () {
+    struct rlimit rlimit;
+    int operation_result;
+
+    operation_result = getrlimit(RLIMIT_STACK, &rlimit);
+    if (operation_result != 0) {
+        std::cerr << "Error getting the call stack struct" << std::endl;
+        return 16 * 1024L * 1024L; //default
+    }
+
+    return rlimit.rlim_cur;
+}
+
+
+void System::ActivateLocalizationMode()
+{
+    currently_localizing_only_ = true;
+    unique_lock<mutex> lock(mMutexMode);
+    mbActivateLocalizationMode = true;
+}
+
+void System::DeactivateLocalizationMode()
+{
+    currently_localizing_only_ = false;
+    unique_lock<mutex> lock(mMutexMode);
+    mbDeactivateLocalizationMode = true;
+}
+
+void System::EnableLocalizationOnly (bool localize_only) {
+  if (localize_only != currently_localizing_only_) {
+    currently_localizing_only_ = localize_only;
+    if (localize_only) {
+      ActivateLocalizationMode();
+    } else {
+      DeactivateLocalizationMode();
+    }
+  }
+
+  std::cout << "Enable localization only: " << (localize_only?"true":"false") << std::endl;
+}
+
+
+// map serialization addition
+bool System::SaveMap(const string &filename) {
+    unique_lock<mutex>MapPointGlobal(MapPoint::mGlobalMutex);
+    std::ofstream out(filename, std::ios_base::binary);
+    if (!out) {
+        std::cerr << "cannot write to map file: " << map_file << std::endl;
+        return false;
+    }
+
+    const rlim_t kNewStackSize = 64L * 1024L * 1024L;   // min stack size = 64 Mb
+    const rlim_t kDefaultCallStackSize = GetCurrentCallStackSize();
+    if (!SetCallStackSize(kNewStackSize)) {
+        std::cerr << "Error changing the call stack size; Aborting" << std::endl;
+        return false;
+    }
+
+    try {
+        std::cout << "saving map file: " << map_file << std::flush;
+        boost::archive::binary_oarchive oa(out, boost::archive::no_header);
+        oa << mpMap;
+        oa << mpKeyFrameDatabase;
+        std::cout << " ... done" << std::endl;
+        out.close();
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
+        SetCallStackSize(kDefaultCallStackSize);
+        return false;
+    } catch (...) {
+        std::cerr << "Unknows exeption" << std::endl;
+        SetCallStackSize(kDefaultCallStackSize);
+        return false;
+    }
+
+    SetCallStackSize(kDefaultCallStackSize);
+    return true;
+}
+
+bool System::LoadMap(const string &filename) {
+
+    unique_lock<mutex>MapPointGlobal(MapPoint::mGlobalMutex);
+    std::ifstream in(filename, std::ios_base::binary);
+    if (!in) {
+        cerr << "Cannot open map file: " << map_file << " , you need create it first!" << std::endl;
+        return false;
+    }
+
+    const rlim_t kNewStackSize = 64L * 1024L * 1024L;   // min stack size = 64 Mb
+    const rlim_t kDefaultCallStackSize = GetCurrentCallStackSize();
+    if (!SetCallStackSize(kNewStackSize)) {
+        std::cerr << "Error changing the call stack size; Aborting" << std::endl;
+        return false;
+    }
+
+    std::cout << "Loading map file: " << map_file << std::flush;
+    boost::archive::binary_iarchive ia(in, boost::archive::no_header);
+    ia >> mpMap;
+    ia >> mpKeyFrameDatabase;
+    mpKeyFrameDatabase->SetORBvocabulary(mpVocabulary);
+    std::cout << " ... done" << std::endl;
+
+    std::cout << "Map reconstructing" << flush;
+    vector<ORB_SLAM2::KeyFrame*> vpKFS = mpMap->GetAllKeyFrames();
+    unsigned long mnFrameId = 0;
+    for (auto it:vpKFS) {
+
+        it->SetORBvocabulary(mpVocabulary);
+        it->ComputeBoW();
+
+        if (it->mnFrameId > mnFrameId) {
+            mnFrameId = it->mnFrameId;
+        }
+    }
+
+    Frame::nNextId = mnFrameId;
+
+    std::cout << " ... done" << std::endl;
+    in.close();
+
+    SetCallStackSize(kDefaultCallStackSize);
+
+    return true;
 }
 
 } //namespace ORB_SLAM
