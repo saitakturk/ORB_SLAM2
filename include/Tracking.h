@@ -24,8 +24,12 @@
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
+#include<opencv2/imgproc/types_c.h>
 
-#include"Viewer.h"
+#include <ros/ros.h>
+#include <sensor_msgs/CameraInfo.h>
+
+
 #include"FrameDrawer.h"
 #include"Map.h"
 #include"LocalMapping.h"
@@ -35,7 +39,6 @@
 #include"KeyFrameDatabase.h"
 #include"ORBextractor.h"
 #include "Initializer.h"
-#include "MapDrawer.h"
 #include "System.h"
 #include "Modeler.h"
 #include "CARV/ModelDrawer.h"
@@ -52,20 +55,28 @@ class LineDetector;
 namespace ORB_SLAM2
 {
 
-class Viewer;
 class FrameDrawer;
 class Map;
 class LocalMapping;
 class LoopClosing;
 class System;
 
+struct ORBParameters{
+    // general parameters for the ORB detector
+    int maxFrames, nFeatures, nLevels, iniThFAST, minThFAST;
+    bool RGB;
+    float scaleFactor, depthMapFactor, thDepth;
+    // camera parameters
+    float fx, fy, cx, cy, baseline;
+    float k1, k2, p1, p2, k3;
+};
 
 class Tracking
-{  
+{
 
 public:
-    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
-             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor);
+    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, Map* pMap,
+             KeyFrameDatabase* pKFDB, const int sensor, ORBParameters& parameters);
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
@@ -74,9 +85,9 @@ public:
 
     void SetLocalMapper(LocalMapping* pLocalMapper);
     void SetLoopClosing(LoopClosing* pLoopClosing);
-    void SetViewer(Viewer* pViewer);
+    void SetMinimumKeyFrames (int min_num_kf) {mnMinimumKeyFrames = min_num_kf;}
 
-	void SetSemiDenseMapping(ProbabilityMapping* pSemiDenseMapping);
+void SetSemiDenseMapping(ProbabilityMapping* pSemiDenseMapping);
     void SetModeler(Modeler* pModeler);
 
     // Load new settings
@@ -165,6 +176,9 @@ protected:
     // "zero-drift" localization to the map.
     bool mbVO;
 
+    //Numer of Keyframes a map has to have to not get a reset in the event of lost tracking.
+    int mnMinimumKeyFrames;
+
     //Other Thread Pointers
     LocalMapping* mpLocalMapper;
     LoopClosing* mpLoopClosing;
@@ -187,14 +201,12 @@ protected:
     KeyFrame* mpReferenceKF;
     std::vector<KeyFrame*> mvpLocalKeyFrames;
     std::vector<MapPoint*> mvpLocalMapPoints;
-    
+
     // System
     System* mpSystem;
-    
+
     //Drawers
-    Viewer* mpViewer;
     FrameDrawer* mpFrameDrawer;
-    MapDrawer* mpMapDrawer;
 
     //Map
     Map* mpMap;
@@ -232,6 +244,14 @@ protected:
     bool mbRGB;
 
     list<MapPoint*> mlpTemporalPoints;
+
+
+    // These parameters are for the ORB features extractor
+    int nFeatures;
+    float fScaleFactor;
+    int nLevels;
+    int fIniThFAST;
+    int fMinThFAST;
 };
 
 } //namespace ORB_SLAM
