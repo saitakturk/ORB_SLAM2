@@ -181,4 +181,21 @@ Model* Map::GetModel()
     return mpModel;
 }
 
+// map serialization addition
+template<class Archive>
+void Map::serialize(Archive &ar, const unsigned int version)
+{
+    // don't save mutex
+    unique_lock<mutex> lock_MapUpdate(mMutexMapUpdate);
+    unique_lock<mutex> lock_Map(mMutexMap);
+    ar & mspMapPoints;
+    ar & mvpKeyFrameOrigins;
+    ar & mspKeyFrames;
+    ar & mvpReferenceMapPoints;
+    ar & mnMaxKFid & mnBigChangeIdx;
+}
+template void Map::serialize(boost::archive::binary_iarchive&, const unsigned int);
+template void Map::serialize(boost::archive::binary_oarchive&, const unsigned int);
+
+
 } //namespace ORB_SLAM
