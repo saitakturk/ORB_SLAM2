@@ -38,7 +38,7 @@ namespace ORB_SLAM2
 LoopClosing::LoopClosing(Map *pMap, KeyFrameDatabase *pDB, ORBVocabulary *pVoc, const bool bFixScale):
     mbResetRequested(false), mbFinishRequested(false), mbFinished(true), mpMap(pMap),
     mpKeyFrameDB(pDB), mpORBVocabulary(pVoc), mLastLoopKFid(0), mbRunningGBA(false), mbFinishedGBA(true),
-    mbStopGBA(false), mbFixScale(bFixScale)
+    mbStopGBA(false), mpThreadGBA(NULL), mbFixScale(bFixScale), mnFullBAIdx(false)
 {
     mnCovisibilityConsistencyTh = 3;
     mpMatchedKF = NULL;
@@ -81,7 +81,7 @@ void LoopClosing::Run()
         if(CheckFinish())
             break;
 
-        usleep(5000);
+        std::this_thread::sleep_for(std::chrono::microseconds(5000));
     }
 
     SetFinish();
@@ -410,19 +410,22 @@ void LoopClosing::CorrectLoop()
     // If a Global Bundle Adjustment is running, abort it
     if(isRunningGBA())
     {
+        unique_lock<mutex> lock(mMutexGBA);
         mbStopGBA = true;
 
-        while(!isFinishedGBA())
-            usleep(5000);
+        mnFullBAIdx = true;
 
-        mpThreadGBA->join();
-        delete mpThreadGBA;
+        if(mpThreadGBA)
+        {
+            mpThreadGBA->detach();
+            delete mpThreadGBA;
+        }
     }
 
     // Wait until Local Mapping has effectively stopped
     while(!mpLocalMapper->isStopped())
     {
-        usleep(1000);
+       std::this_thread::sleep_for(std::chrono::microseconds(1000));
     }
 
     // Ensure current keyframe is updated
@@ -624,7 +627,7 @@ void LoopClosing::RequestReset()
         if(!mbResetRequested)
             break;
         }
-        usleep(5000);
+        std::this_thread::sleep_for(std::chrono::microseconds(5000));
     }
 }
 
@@ -643,9 +646,9 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 {
     cout << "Starting Global Bundle Adjustment" << endl;
 
-    Optimizer::GlobalBundleAdjustemnt(mpMap,20,&mbStopGBA,nLoopKF,false);
-
-    //carv: prepare bundle adjust entry
+    bool idx =  mnFullBAIdx;
+    Optimizer::GlobalBundleAdjustemnt(mpMap,10,&mbStopGBA,nLoopKF,false);
+     //carv: prepare bundle adjust entry
     std::set<KeyFrame*> sBAKF;
     std::set<MapPoint*> sBAMP;
 
@@ -655,7 +658,8 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
     // We need to propagate the correction through the spanning tree
     {
         unique_lock<mutex> lock(mMutexGBA);
-
+        if(idx!=mnFullBAIdx)
+            return;
 
         if(!mbStopGBA)
         {
@@ -666,7 +670,7 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
 
             while(!mpLocalMapper->isStopped() && !mpLocalMapper->isFinished())
             {
-                usleep(1000);
+                std::this_thread::sleep_for(std::chrono::microseconds(1000));
             }
 
             // Get Map Mutex
@@ -740,6 +744,8 @@ void LoopClosing::RunGlobalBundleAdjustment(unsigned long nLoopKF)
                     sBAMP.insert(pMP);
                 }
             }
+
+            mpMap->InformNewBigChange();
 
             mpLocalMapper->Release();
 
