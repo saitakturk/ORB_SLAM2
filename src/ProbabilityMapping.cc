@@ -41,8 +41,6 @@
 #include "ORBmatcher.h"
 #include "LocalMapping.h"
 #include "Modeler.h"
-#include "MapDrawer.h"
-#include <pangolin/pangolin.h>
 #include <thread>
 
 
@@ -203,14 +201,11 @@ void ProbabilityMapping::SaveSemiDensePoints()
 ProbabilityMapping::ProbabilityMapping(ORB_SLAM2::Map* pMap, Modeler* pModeler):mbResetRequested(false)
 {
     mpMap = pMap;
-    //mpModelDrawer= new ModelDrawer();
-    mpModelDrawer = pModeler->mpModelDrawer;
     mbFinishRequested = false; //init
     mbFinished = false;
     //mpModeler = new Modeler(mpMap);
     mpModeler = pModeler;
     mpMap->SetModeler(mpModeler);
-    mpModelDrawer->SetModeler(mpModeler);
     mLineDetector = new LineDetector();
     mPlaneExtractor = new PlaneExtractor();
 }
@@ -259,7 +254,7 @@ void ProbabilityMapping::Run()
 
 /*
  *    TestSemiDenseViewer:
- *     add const depth to every pixel,  used to test show semidense in pangolin
+ *     add const depth to every pixel
  */
 
 void ProbabilityMapping::SemiDenseLoop(){
@@ -469,47 +464,6 @@ void ProbabilityMapping::SemiDenseLoop(){
     }
 }
 
-void ProbabilityMapping::TestSemiDenseViewer()
-{
-    std::vector<ORB_SLAM2::KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
-    if(vpKFs.size() < 2)
-    {
-        return;
-    }
-    for(size_t i =0;i < vpKFs.size(); i++ )
-    {
-        ORB_SLAM2::KeyFrame* pKF = vpKFs[i];
-        if(pKF->isBad() || pKF->semidense_flag_)
-            continue;
-
-        cv::Mat image = pKF->GetImage();
-        std::vector<std::vector<depthHo> > temp_ho (image.rows, std::vector<depthHo>(image.cols, depthHo()) );
-
-        for(int y = 0; y < image.rows; ){
-            for(int x = 0; x < image.cols; ){
-
-                depthHo dh;
-                dh.depth = 100.0;   // const
-                float X = dh.depth*(x- pKF->cx ) / pKF->fx;
-                float Y = dh.depth*(y- pKF->cy ) / pKF->fy;
-                cv::Mat Pc = (cv::Mat_<float>(4,1) << X, Y , dh.depth, 1); // point in camera frame.
-                cv::Mat Twc = pKF->GetPoseInverse();
-                cv::Mat pos = Twc * Pc;
-                dh.Pw<< pos.at<float>(0),pos.at<float>(1),pos.at<float>(2);
-                dh.supported = true;
-                temp_ho[y][x] = dh;  // save point to keyframe semidense map
-
-                x = x+4; // don't use all pixel to test
-            }
-            y = y+4;
-        }
-        pKF->semidense_flag_ = true;
-    }
-    cout<<"semidense_Info:    vpKFs.size()--> "<<vpKFs.size()<<std::endl;
-
-
-}
-
 void ProbabilityMapping::RequestReset()
 {
     {
@@ -532,14 +486,6 @@ void ProbabilityMapping::ResetIfRequested()
     unique_lock<mutex> lock(mMutexReset);
     if(mbResetRequested)
     {
-        //Modeler* newModeler = new Modeler(mpMap);
-        /*Modeler* newModeler= new Modeler(mpModelDrawer);
-        mpMap->SetModeler(newModeler);
-        mpModelDrawer->SetModeler(newModeler);
-        //newModeler->UpdateModel();
-        newModeler->UpdateModelDrawer();
-        delete mpModeler;
-        mpModeler = newModeler;*/
         mLineDetector->Reset();
         mPlaneExtractor->Reset();
         mbResetRequested=false;
@@ -1664,9 +1610,8 @@ void ProbabilityMapping::UpdateModel(ORB_SLAM2::KeyFrame* kf)
     mpModeler->RunRemainder();
 
     //mpModeler->UpdateModel();
-    mpModeler->UpdateModelDrawer();
-            }
-    mpModeler->UpdateModelDrawer();
+
+    }
 }
 
 

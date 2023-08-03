@@ -9,12 +9,10 @@
 #include "CARV/Matrix.h"
 #include "CARV/SFMTranscriptInterface_ORBSLAM.h"
 #include "CARV/SFMTranscriptInterface_Delaunay.h"
-#include "CARV/ModelDrawer.h"
 #include "CARV/TextureFrame.h"
 
 class Cluster;
 class TextureFrame;
-class ModelDrawer;
 
 namespace ORB_SLAM2 {
     class KeyFrame;
@@ -50,8 +48,7 @@ class Modeler {
 public:
     
     Modeler(ORB_SLAM2::Map* pMap);
-    Modeler(ModelDrawer* pModelDrawer);
-
+    Modeler();
     //TODO: Loop Closing
     void SetLoopCloser(ORB_SLAM2::LoopClosing* pLoopCloser);
     void SetLocalMapper(ORB_SLAM2::LocalMapping* pLocalMapper);
@@ -65,7 +62,6 @@ public:
     void RunRemainder();
     void RunOnce();
     void UpdateModel();
-    void UpdateModelDrawer();
 
     void WriteModel(std::string filename);
     void AddPlaneKeyFrameEntry(ORB_SLAM2::KeyFrame *pKF);
@@ -89,7 +85,6 @@ public:
     SFMTranscriptInterface_Delaunay mAlgInterface; // An encapsulation of the interface between the transcript and the surface inferring algorithm.
 
     ORB_SLAM2::Map* mpMap;
-    ModelDrawer* mpModelDrawer; 
     std::mutex mMutexReset;
     void ResetIfRequested();
     bool mbResetRequested;

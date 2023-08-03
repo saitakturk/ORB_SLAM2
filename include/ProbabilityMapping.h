@@ -40,7 +40,6 @@
 
 #include "LineDetector.h"
 #include"PlaneExtractor.h"
-#include "CARV/ModelDrawer.h"
 
 // parameters for semidense mapping
 #define covisN 7
@@ -67,7 +66,6 @@ namespace cv {
 }
 
 class Modeler;
-class ModelDrawer;
 
 // thread for semi-dense mapping: compute depth for pixels on keyframes
 class ProbabilityMapping {
@@ -89,7 +87,6 @@ public:
 	// loop for each keyframe
 	void SemiDenseLoop();
 
-	void TestSemiDenseViewer();
 	void StereoSearchConstraints(ORB_SLAM2::KeyFrame* kf, float* min_depth, float* max_depth);
 	void EpipolarSearch(ORB_SLAM2::KeyFrame *kf1, ORB_SLAM2::KeyFrame *kf2, const int x, const int y, float pixel, float min_depth, float max_depth, depthHo *dh, cv::Mat F12, float &best_u, float &best_v,float th_pi,float rot);
 	void GetSearchRange(float& umin, float& umax, int px, int py, float mind, float maxd, ORB_SLAM2::KeyFrame* kf, ORB_SLAM2::KeyFrame* kf2);
@@ -133,7 +130,6 @@ private:
 	ORB_SLAM2::Map* mpMap;
 
 	Modeler* mpModeler;
-	ModelDrawer* mpModelDrawer;
 
 	LineDetector* mLineDetector;
 

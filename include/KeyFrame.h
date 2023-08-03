@@ -145,8 +145,7 @@ public:
     // Enable/Disable bad flag changes from viewer thread
     void SetNotEraseDrawer();
     void SetEraseDrawer();
-    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
-
+ 
     // for drawing model
     vector<float> GetTexCoordinate(float x, float y, float z);
     std::vector<cv::Mat> GetPlaneCloud(int i);

@@ -30,7 +30,6 @@
 
 
 #include "Tracking.h"
-#include "MapDrawer.h"
 #include "FrameDrawer.h"
 #include "Map.h"
 #include "LocalMapping.h"
@@ -39,16 +38,13 @@
 #include "ORBVocabulary.h"
 #include "ProbabilityMapping.h"
 #include "Modeler.h"
-#include "CARV/ModelDrawer.h"
 #include <unistd.h>
 
 class Modeler;
-class ModelDrawer;
 namespace ORB_SLAM2
 {
 
 class FrameDrawer;
-class Viewer;
 class Map;
 class Tracking;
 class LocalMapping;
@@ -128,7 +124,6 @@ public:
     // SaveMap(const string &filename);
     // LoadMap(const string &filename);
     Modeler* mpModeler;
-    MapDrawer* mpMapDrawer;
 
 
     void SetMinimumKeyFrames (int min_num_kf);
@@ -185,9 +180,6 @@ public:
     // performs relocalization if tracking fails.
     Tracking* mpTracker;
 
-    //Modeler pointer
-   
-    ModelDrawer* mpModelDrawer;
 
     // Local Mapper. It manages the local map and performs local bundle adjustment.
     LocalMapping* mpLocalMapper;
@@ -195,9 +187,6 @@ public:
     // Loop Closer. It searches loops with every new keyframe. If there is a loop it performs
     // a pose graph optimization and full bundle adjustment (in a new thread) afterwards.
     LoopClosing* mpLoopCloser;
-
-    // The viewer draws the map and the current camera pose. It uses Pangolin.
-    //fViewer* mpViewer;
 
     FrameDrawer* mpFrameDrawer;
 
@@ -207,7 +196,6 @@ public:
     // The Tracking thread "lives" in the main execution thread that creates the System object.
     std::thread* mptLocalMapping;
     std::thread* mptLoopClosing;
-    std::thread* mptViewer;
     std::thread* mptSemiDense;
     std::thread* mptModeler;
 

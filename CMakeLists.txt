@@ -41,7 +41,6 @@ if(NOT OpenCV_FOUND)
 endif()
 message(STATUS "Using opencv version ${OpenCV_VERSION}")
 find_package(Eigen3 3.1.0 REQUIRED)
-find_package(Pangolin REQUIRED)
 
 # find openmp
 find_package(OpenMP)
@@ -84,7 +83,6 @@ include_directories(
 ${PROJECT_SOURCE_DIR}
 ${PROJECT_SOURCE_DIR}/include
 ${EIGEN3_INCLUDE_DIR}
-${Pangolin_INCLUDE_DIRS}
 ${PROJECT_SOURCE_DIR}/Thirdparty/EDTest
 
 )
@@ -103,14 +101,12 @@ src/Converter.cc
 src/MapPoint.cc
 src/KeyFrame.cc
 src/Map.cc
-src/MapDrawer.cc
 src/Optimizer.cc
 src/PnPsolver.cc
 src/Frame.cc
 src/KeyFrameDatabase.cc
 src/Sim3Solver.cc
 src/Initializer.cc
-src/Viewer.cc
 src/ProbabilityMapping.cc
 src/Modeler.cc
 src/LineDetector.cc
@@ -124,14 +120,12 @@ src/CARV/Matrix.cc
 src/CARV/StringFunctions.cpp
 src/CARV/Exception.cpp
 src/CARV/SFMTranscriptInterface_ORBSLAM.cpp
-src/CARV/ModelDrawer.cc
 src/CARV/TextureFrame.cc
 )
 
 target_link_libraries(${PROJECT_NAME}
 ${OpenCV_LIBS}
 ${EIGEN3_LIBS}
-${Pangolin_LIBRARIES}
 ${PROJECT_SOURCE_DIR}/Thirdparty/DBoW2/lib/libDBoW2.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/g2o/lib/libg2o.so
 ${PROJECT_SOURCE_DIR}/Thirdparty/EDLines/EDLinesLib.a

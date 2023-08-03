@@ -41,7 +41,6 @@
 #include "Initializer.h"
 #include "System.h"
 #include "Modeler.h"
-#include "CARV/ModelDrawer.h"
 #include "LineDetector.h"
 
 #include <mutex>
@@ -49,7 +48,6 @@
 
 class ProbabilityMapping;
 class Modeler;
-class ModelDrawer;
 class LineDetector;
 
 namespace ORB_SLAM2
@@ -97,7 +95,6 @@ void SetSemiDenseMapping(ProbabilityMapping* pSemiDenseMapping);
 
     // Use this function if you have deactivated local mapping and you only want to localize the camera.
     void InformOnlyTracking(const bool &flag);
-    void GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M);
 
 
 public:

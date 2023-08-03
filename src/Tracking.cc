@@ -20,7 +20,6 @@
 
 
 #include "Tracking.h"
-#include <pangolin/pangolin.h>
 
 #include<opencv2/core/core.hpp>
 #include<opencv2/features2d/features2d.hpp>
@@ -448,8 +447,6 @@ void Tracking::Track()
             else
                 mVelocity = cv::Mat();
 
-            //mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
-            //    mpMapDrawer->GetCurrentCameraMatrix();
             // Clean VO matches
             for(int i=0; i<mCurrentFrame.N; i++)
             {
@@ -570,8 +567,6 @@ void Tracking::StereoInitialization()
         mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
 
         mpMap->mvpKeyFrameOrigins.push_back(pKFini);
-
-        //mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 
         mState=OK;
     }
@@ -705,7 +700,6 @@ void Tracking::CreateInitialMapMonocular()
     // Set median depth to 1
     float medianDepth = pKFini->ComputeSceneMedianDepth(2);
     float invMedianDepth = 1.0f/medianDepth;
-    //mpMapDrawer->invDepth =invMedianDepth;
 
     if(medianDepth<0 || pKFcur->TrackedMapPoints(1)<100)
     {
@@ -746,8 +740,6 @@ void Tracking::CreateInitialMapMonocular()
     mLastFrame = Frame(mCurrentFrame);
 
     mpMap->SetReferenceMapPoints(mvpLocalMapPoints);
-
-    //mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
 
     mpMap->mvpKeyFrameOrigins.push_back(pKFini);
 
@@ -1613,41 +1605,5 @@ void Tracking::SetModeler(Modeler *pModeler)
 {
     mpModeler=pModeler;
 }
-void Tracking::GetCurrentOpenGLCameraMatrix(pangolin::OpenGlMatrix &M)
-{
-    if(!mCurrentFrame.mTcw.empty())
-    {
-        cv::Mat Rwc(3,3,CV_32F);
-        cv::Mat twc(3,1,CV_32F);
-        {
-            //unique_lock<mutex> lock(mMutexPose);
-            Rwc = mCurrentFrame.mTcw.rowRange(0,3).colRange(0,3).t();
-            twc = -Rwc*mCurrentFrame.mTcw.rowRange(0,3).col(3);
-        }
-
-        M.m[0] = Rwc.at<float>(0,0);
-        M.m[1] = Rwc.at<float>(1,0);
-        M.m[2] = Rwc.at<float>(2,0);
-        M.m[3]  = 0.0;
-
-        M.m[4] = Rwc.at<float>(0,1);
-        M.m[5] = Rwc.at<float>(1,1);
-        M.m[6] = Rwc.at<float>(2,1);
-        M.m[7]  = 0.0;
-
-        M.m[8] = Rwc.at<float>(0,2);
-        M.m[9] = Rwc.at<float>(1,2);
-        M.m[10] = Rwc.at<float>(2,2);
-        M.m[11]  = 0.0;
-
-        M.m[12] = twc.at<float>(0);
-        M.m[13] = twc.at<float>(1);
-        M.m[14] = twc.at<float>(2);
-        M.m[15]  = 1.0;
-    }
-    else
-        M.SetIdentity();
-}
-
 
 } //namespace ORB_SLAM

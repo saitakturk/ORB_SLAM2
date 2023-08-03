@@ -100,8 +100,7 @@ namespace ORB_SLAM2
         // end map serialization addition
 
         // Model Drawer
-        mpModelDrawer = new ModelDrawer();
-        mpModeler = new Modeler(mpModelDrawer);
+        mpModeler = new Modeler();
 
         // Create Drawers. These are used by the Viewer
         mpFrameDrawer = new FrameDrawer(mpMap);
@@ -126,11 +125,8 @@ namespace ORB_SLAM2
         // Modeler Thread
 
         // Initialize the Viewer thread and launch
-        // mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpModelDrawer,mpTracker,strSettingsFile);
         mptModeler = new thread(&Modeler::Run, mpModeler);
 
-
-        //mpTracker->SetViewer(mpViewer);
 
         // Set pointers between threads
         mpTracker->SetLocalMapper(mpLocalMapper);
@@ -151,7 +147,6 @@ namespace ORB_SLAM2
         mpMap->SetModeler(mpModeler);
         mpTracker->SetModeler(mpModeler);
         mpLocalMapper->SetModeler(mpModeler);
-        mpModelDrawer->SetModeler(mpModeler);
     }
 
     void System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp)

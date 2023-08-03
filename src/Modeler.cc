@@ -3,8 +3,8 @@
 #include "Modeler.h"
 #include "Map.h"
 #include "KeyFrame.h"
-#include <pangolin/pangolin.h>
 #include "LineDetector.h"
+#include <opencv2/opencv.hpp>
 #include <boost/filesystem.hpp>
 
 // Model Class
@@ -73,7 +73,7 @@ Modeler::Modeler(ORB_SLAM2::Map* pMap)
     mAlgInterface.setTranscriptRef(mTranscriptInterface.getTranscriptToProcessRef());
     mAlgInterface.rewind();
 }
-Modeler::Modeler(ModelDrawer* pModelDrawer): mpModelDrawer(pModelDrawer),mnLastNumLines(2),mbResetRequested(false),mbFirstKeyFrame(true),mnMaxTextureQueueSize(10),
+Modeler::Modeler():mnLastNumLines(2),mbResetRequested(false),mbFirstKeyFrame(true),mnMaxTextureQueueSize(10),
         mnMaxFrameQueueSize(5000),mnMaxToLinesQueueSize(500),mbFinishRequested(false), mbFinished(true)
 {
     mAlgInterface.setAlgorithmRef(&mObjAlgorithm);
@@ -83,8 +83,6 @@ Modeler::Modeler(ModelDrawer* pModelDrawer): mpModelDrawer(pModelDrawer),mnLastN
 void Modeler::WriteModel(std::string filename)
 {
     mAlgInterface.writeCurrentModelToFile(filename);
-    //mpModelDrawer->writeobj(filename);
-
 }
 
 void Modeler::AddKeyFrameEntry(ORB_SLAM2::KeyFrame *pKF)
@@ -146,7 +144,6 @@ void Modeler::Run()
 
                 RunRemainder();
 
-                UpdateModelDrawer();
                 boost::filesystem::path dir("ObjectFiles");
                 boost::filesystem::path objfile = boost::filesystem::current_path()/dir;
                 if(!boost::filesystem::exists(objfile) && !boost::filesystem::create_directories(objfile))
@@ -214,7 +211,7 @@ void Modeler::AddFrameImage(const long unsigned int &frameID, const cv::Mat &im)
         cv::Mat imc;
         im.copyTo(imc);
         if(imc.channels() < 3)
-            cvtColor(imc,imc,CV_GRAY2RGB);
+            cvtColor(imc,imc,cv::COLOR_GRAY2RGB);
 
         if (mmFrameQueue.size() >= mnMaxFrameQueueSize) {
             mmFrameQueue.erase(mmFrameQueue.begin());
@@ -250,14 +247,6 @@ void Modeler::AddTexture(ORB_SLAM2::KeyFrame* pKF)
             mdTextureQueue.pop_front();
         }
         mdTextureQueue.push_back(texFrame);
-    }
-
-void Modeler::UpdateModelDrawer() {
-        if(mpModelDrawer->UpdateRequested() && ! mpModelDrawer->UpdateDone()) {
-            std::pair<std::vector<dlovi::Matrix>, std::list<dlovi::Matrix> > objModel = mAlgInterface.getCurrentModel();
-            mpModelDrawer->SetUpdatedModel(objModel.first, objModel.second);
-            mpModelDrawer->MarkUpdateDone();
-        }
     }
 
  void Modeler::RequestReset()
